@@ -7,9 +7,12 @@ const express_1 = __importDefault(require("express"));
 const ws_1 = require("ws");
 const http_1 = require("http");
 const utils_1 = require("./utils");
+const roomjoin_1 = require("./roomjoin");
+const utils_2 = require("./utils");
 const rooms = {};
 // active user check
 (0, utils_1.player_active_check)(rooms);
+(0, utils_2.getwords)();
 const app = (0, express_1.default)();
 const server = (0, http_1.createServer)(app);
 app.use(express_1.default.json());
@@ -20,41 +23,25 @@ wss.on("connection", (wss) => {
         let data = JSON.parse(message.toString());
         // join room condition
         if (data.type == 'join') {
-            let { room_id, client_id } = (0, utils_1.room_handler)(data.header.name, rooms, wss);
-            if (client_id == 0) {
-                wss.send(JSON.stringify({
-                    type: "wait",
-                    roomdesc: {
-                        roomid: room_id,
-                        clientid: client_id,
-                    },
-                    header: {
-                        name: data.header.name,
-                    }
-                }));
-            }
-            else {
-                rooms[room_id].forEach(el => {
-                    el.wss.send(JSON.stringify({
-                        type: "newjoin",
-                        roomdesc: {
-                            roomid: room_id,
-                            clientid: client_id,
-                        },
-                        header: {
-                            name: data.header.name,
-                            others: rooms[room_id]
-                        }
-                    }));
-                });
-            }
+            (0, roomjoin_1.joinroom)(data, rooms, wss);
         }
         // heart beating condition
-        if (data.type == 'heartbeat') {
-            const roomid = data.roomdesc.roomid;
-            const clientid = parseInt(data.roomdesc.clientid);
-            console.log("rooid, clientid => ", roomid, clientid);
-            rooms[roomid][clientid].isActive = true;
+        else if (data.type == 'heartbeat') {
+            (0, utils_2.heartBeat)(data, rooms);
+        }
+        else if (data.type == "boarddata") {
+            (0, utils_2.boardData)(rooms, data);
+        }
+        else if (data.type == "chat") {
+            (0, utils_2.chatRoom)(rooms, data);
+        }
+        else if (data.type == 'chooseword') {
+            console.log("word choose event");
+            (0, utils_2.chooseword)(rooms, data);
+        }
+        else if (data.type == 'wordchoosen') {
+            console.log("word choosed event");
+            (0, utils_2.wordChoose)(rooms, data);
         }
     });
     wss.on('close', () => {
@@ -68,13 +55,11 @@ server.listen(3000, () => {
     console.log("Server is running on http://localhost:3000");
 });
 // {
-//   type: wait | newjoin | join(backend) | heartbeat(backend)
-//   roomdesc:{
-//            roomid:
-//            clientid:
-//            }
+//   type: wait | newjoin | join(backend) | heartbeat(backend) | updateclients } chooseword
 //   header:{
 //             name:
+//             room_id: 
+//             client_id : 
 //             others:[]
 //          }
 // }

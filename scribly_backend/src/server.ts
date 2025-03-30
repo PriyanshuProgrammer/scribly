@@ -1,63 +1,56 @@
 import express from "express";
 import WebSocket, {WebSocketServer} from 'ws'
 import {createServer} from 'http'
-import { room_handler, player_active_check } from "./utils";
+import { player_active_check } from "./utils";
+import { joinroom } from "./roomjoin";
+import { heartBeat, boardData, chatRoom, getwords, chooseword, wordChoose } from "./utils";
 
-const rooms:Record<string,Array<{name:string,wss:WebSocket, isActive:boolean}>> = {}
+const rooms:Record<string,Array<{name:string,clientId:string,wss:WebSocket, isActive:boolean}>> = {}
 
 // active user check
 player_active_check(rooms)
-
+getwords()
 const app = express();
 const server = createServer(app)
 app.use(express.json())
 
 const wss = new WebSocketServer({server})
 
+
 wss.on("connection",(wss)=>{
     console.log("rooms: ", rooms)
 
     wss.on('message', (message) => {
       let data = JSON.parse(message.toString())
+
       // join room condition
       if(data.type == 'join'){
-        let {room_id, client_id}  = room_handler(data.header.name,rooms,wss)
-        if(client_id == 0){
-          wss.send(JSON.stringify({
-            type:"wait",
-            roomdesc:{
-              roomid:room_id, 
-              clientid:client_id,
-            },
-            header:{
-              name:data.header.name,
-            }
-          }))
-        }else{
-          rooms[room_id].forEach(el=>{
-            el.wss.send(JSON.stringify({
-              type:"newjoin",
-              roomdesc:{
-                roomid:room_id, 
-                clientid:client_id,
-              },
-              header:{
-                name:data.header.name,
-                others:rooms[room_id]
-              }
-            }))
-          })
-        }
+        joinroom(data, rooms, wss)
       } 
       
       // heart beating condition
-      if(data.type == 'heartbeat'){
-        const roomid = data.roomdesc.roomid
-        const clientid = parseInt(data.roomdesc.clientid)
-        console.log("rooid, clientid => ", roomid, clientid) 
-        rooms[roomid][clientid].isActive = true;
+      else if(data.type == 'heartbeat'){
+        heartBeat(data, rooms)
       }
 
+      else if(data.type == "boarddata"){
+        boardData(rooms, data)
+      }
+
+      else if(data.type == "chat"){
+        chatRoom(rooms, data)
+      }
+
+      else if(data.type == 'chooseword'){
+        console.log("word choose event")
+        chooseword(rooms, data)
+      }
+
+      else if(data.type == 'wordchoosen'){
+        console.log("word choosed event")
+        wordChoose(rooms, data)
+      }
+      
     }) 
 
     wss.on('close',()=>{
@@ -76,17 +69,14 @@ server.listen(3000, () => {
 
 
 // {
-//   type: wait | newjoin | join(backend) | heartbeat(backend)
-//   roomdesc:{
-//            roomid:
-//            clientid:
-//            }
+//   type: wait | newjoin | join(backend) | heartbeat(backend) | updateclients } chooseword
 //   header:{
 //             name:
+//             room_id: 
+//             client_id : 
 //             others:[]
 //          }
 // }
-
 
 
 // player leave problem

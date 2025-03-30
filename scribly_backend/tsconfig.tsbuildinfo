@@ -1,1 +1,1 @@
-{"root":["./src/server.ts","./src/utils.ts"],"version":"5.8.2"}
+{"root":["./src/gamelogic.ts","./src/roomjoin.ts","./src/roomupdate.ts","./src/server.ts","./src/utils.ts"],"version":"5.8.2"}
